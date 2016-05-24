@@ -1,4 +1,4 @@
-/*! pym.js - v0.4.4 - 2015-07-16 */
+/*! pym.js - v0.4.6 - 2016-05-24 */
 /*
 * Pym.js is library that resizes an iframe based on the width of the parent and the resulting height of the child.
 * Check out the docs at http://blog.apps.npr.org/pym.js/ or the readme at README.md for usage.
@@ -192,19 +192,35 @@
             // Append the iframe to our element.
             this.el.appendChild(this.iframe);
 
-            // Add an event listener that will handle redrawing the child on resize.
-            window.addEventListener('resize', this._onResize);
-        };
+            // rAF polyfill
+            var raf = window.requestAnimationFrame ||
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame ||
+                window.msRequestAnimationFrame ||
+                function(callback) { return setTimeout(callback, 1000 / 60); };
+            
+            // store for convenience
+            var storeWidth = {previous: 0, current: 0};
 
-        /**
-         * Send width on resize.
-         *
-         * @memberof Parent.prototype
-         * @method _onResize
-         */
-        this._onResize = function() {
-            this.sendWidth();
-        }.bind(this);
+            var pollWidth = function() {
+                // set current width to that of container
+                storeWidth.current = this.el.offsetWidth;
+
+                // if it has changed the send new width to parent
+                if (storeWidth.current !== storeWidth.previous) {
+
+                    // store current width to compare next time
+                    storeWidth.previous = storeWidth.current;
+
+                    // and notify pym child
+                    this.sendWidth();
+                }
+                // loop this forever with rAF
+                raf(pollWidth);
+            }.bind(this);
+
+            pollWidth();
+        };
 
         /**
          * Fire all event handlers for a given message type.
@@ -230,7 +246,6 @@
          */
         this.remove = function() {
             window.removeEventListener('message', this._processMessage);
-            window.removeEventListener('resize', this._onResize);
 
             this.el.removeChild(this.iframe);
         };
@@ -490,6 +505,44 @@
         };
 
         /**
+         * Use rAF to automatically send height on change
+         *
+         * @memberof Child.prototype
+         * @method _poll
+         */
+        this._poll = function() {
+            // rAF polyfill
+            var raf = window.requestAnimationFrame ||
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame ||
+                window.msRequestAnimationFrame ||
+                function(callback) { return setTimeout(callback, 1000 / 60); };
+            
+            // store for convenience
+            var height = {previous: 0, current: 0};
+            var bodyElement = document.getElementsByTagName('body')[0];
+
+            var pollHeight = function() {
+                // set current height to that of container
+                height.current = bodyElement.offsetHeight;
+
+                // if it has changed the send new height to parent
+                if (height.current !== height.previous) {
+
+                    // store current height to compare next time
+                    height.previous = height.current;
+
+                    // and notify pym parent
+                    this.sendHeight();
+                }
+                // loop this forever with rAF
+                raf(pollHeight);
+            }.bind(this);
+
+            pollHeight();
+        };
+
+        /**
          * Send a message to the the Parent.
          *
          * @memberof Child.prototype
@@ -571,9 +624,9 @@
         // Send the initial height to the parent.
         this.sendHeight();
 
-        // If we're configured to poll, create a setInterval to handle that.
+        // If we're configured to poll, setup polling
         if (this.settings.polling) {
-            window.setInterval(this.sendHeight, this.settings.polling);
+            this._poll();
         }
 
         return this;
