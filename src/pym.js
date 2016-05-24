@@ -191,19 +191,35 @@
             // Append the iframe to our element.
             this.el.appendChild(this.iframe);
 
-            // Add an event listener that will handle redrawing the child on resize.
-            window.addEventListener('resize', this._onResize);
-        };
+            // rAF polyfill
+            var raf = window.requestAnimationFrame ||
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame ||
+                window.msRequestAnimationFrame ||
+                function(callback) { return setTimeout(callback, 1000 / 60); };
+            
+            // store for convenience
+            var storeWidth = {previous: 0, current: 0};
 
-        /**
-         * Send width on resize.
-         *
-         * @memberof Parent.prototype
-         * @method _onResize
-         */
-        this._onResize = function() {
-            this.sendWidth();
-        }.bind(this);
+            var pollWidth = function() {
+                // set current width to that of container
+                storeWidth.current = this.el.offsetWidth;
+
+                // if it has changed the send new width to parent
+                if (storeWidth.current !== storeWidth.previous) {
+
+                    // store current width to compare next time
+                    storeWidth.previous = storeWidth.current;
+
+                    // and notify pym child
+                    this.sendWidth();
+                }
+                // loop this forever with rAF
+                raf(pollWidth);
+            }.bind(this);
+
+            pollWidth();
+        };
 
         /**
          * Fire all event handlers for a given message type.
@@ -229,7 +245,6 @@
          */
         this.remove = function() {
             window.removeEventListener('message', this._processMessage);
-            window.removeEventListener('resize', this._onResize);
 
             this.el.removeChild(this.iframe);
         };
