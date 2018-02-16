@@ -3,3 +3,10 @@
 node_modules
 *.swp
 *.swo
+*.log
+api
+build
+dist
+sauce/*.log
+sauce/sauce_cred.json
+.gzip/
