@@ -6,6 +6,7 @@ node_modules
 *.log
 api
 build
+dist
 sauce/*.log
 sauce/sauce_cred.json
 .gzip/
